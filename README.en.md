@@ -57,8 +57,8 @@ Then open `http://127.0.0.1:8000` in your phone browser.
 **Do not use the Google Play build** — it's been unmaintained for years and won't work.
 
 - **F-Droid (recommended)** — <https://f-droid.org/packages/com.termux/>, scroll to the version list and tap *Download APK* next to the latest. You don't need the F-Droid client.
-- **GitHub direct** — <https://github.com/termux/termux-app/releases/download/v0.118.3/termux-app_v0.118.3+github-debug_universal.apk>
-  (113 MB, universal — runs on any phone. On arm64 you can swap in `..._arm64-v8a.apk` instead, which is only 35 MB.)
+- **GitHub direct** — <https://github.com/termux/termux-app/releases/download/v0.118.3/termux-app_v0.118.3+github-debug_arm64-v8a.apk>
+  (34 MB, for arm64 phones — which is every model since roughly 2016. On a 32-bit device, pick another architecture from the [releases page](https://github.com/termux/termux-app/releases).)
 
 Verify with `pkg --version` in Termux.
 

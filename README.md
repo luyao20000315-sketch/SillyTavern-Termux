@@ -59,8 +59,8 @@ curl -fsSL https://raw.githubusercontent.com/luyao20000315-sketch/SillyTavern-Te
 二选一：
 
 - **F-Droid（推荐）** 打开 <https://f-droid.org/packages/com.termux/>，在「版本」列表里点最新版旁边的 Download APK。不用装 F-Droid 客户端。
-- **GitHub 直接下** <https://github.com/termux/termux-app/releases/download/v0.118.3/termux-app_v0.118.3+github-debug_universal.apk>
-  （113MB，全架构通用，什么手机都能装。手机是 arm64 的话可以换成 `..._arm64-v8a.apk`，只有 35MB）
+- **GitHub 直接下** <https://github.com/termux/termux-app/releases/download/v0.118.3/termux-app_v0.118.3+github-debug_arm64-v8a.apk>
+  （34MB，适用于 arm64 手机 —— 2016 年以后的机型基本都是。32 位老机器请到 [releases 页面](https://github.com/termux/termux-app/releases) 选其他架构）
 
 装好打开，输入 `pkg --version` 能打印出版本号就对了。
 

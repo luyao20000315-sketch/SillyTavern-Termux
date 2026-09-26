@@ -46,7 +46,7 @@ rule() { printf '%s%s%s\n' "$C_DIM" "-------------------------------------------
 # ------------------------------------------------------------ 前置检查
 # Termux 稳定版是 v0.118.3。注意别写成 apt-android-N 那种名字 —— 那只存在于
 # 0.119.0-beta 预发布里，稳定版全是 +github-debug_<架构> 命名。
-readonly TERMUX_APK_URL="https://github.com/termux/termux-app/releases/download/v0.118.3/termux-app_v0.118.3+github-debug_universal.apk"
+readonly TERMUX_APK_URL="https://github.com/termux/termux-app/releases/download/v0.118.3/termux-app_v0.118.3+github-debug_arm64-v8a.apk"
 
 require_termux() {
   [ -d /data/data/com.termux ] && return 0
@@ -59,9 +59,9 @@ err 这个脚本只能在 Termux 里跑。
     https://f-droid.org/packages/com.termux/
     拉到「版本」列表，点最新版旁边的 Download APK
 
-  GitHub 直接下（113MB，全架构通用，什么手机都能装）
+  GitHub 直接下（34MB，arm64 手机 —— 2016 年之后的机型基本都是）
     $TERMUX_APK_URL
-    手机是 arm64 的话可以换 ..._arm64-v8a.apk，只有 35MB
+    32 位老机器请到 https://github.com/termux/termux-app/releases 选其他架构
 
   千万别用 Google Play 里那个旧版，跑不起来。
 
