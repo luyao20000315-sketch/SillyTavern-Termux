@@ -2,7 +2,7 @@
 
 在安卓手机上一条命令装好 [SillyTavern](https://github.com/SillyTavern/SillyTavern)（酒馆），并附一个输数字就能用的管理面板。
 
-不需要电脑、不需要服务器、不需要科学上网。
+不需要电脑、不需要服务器，也不用额外折腾网络。
 
 > Apache-2.0 · 免费使用 · 可商用
 
@@ -18,7 +18,7 @@ Termux 里粘一条命令，剩下的它自己办。**按你的网络选一条**
 curl -fsSL https://gitee.com/luyao23333/silly-tavern-termux/raw/main/install.sh | bash
 ```
 
-**能翻墙 / 海外**
+**海外网络**
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/luyao20000315-sketch/SillyTavern-Termux/main/install.sh | bash

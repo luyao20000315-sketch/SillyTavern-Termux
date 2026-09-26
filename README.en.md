@@ -2,7 +2,7 @@
 
 Install [SillyTavern](https://github.com/SillyTavern/SillyTavern) on an Android phone with one command — plus a numbered menu for running it day to day.
 
-No PC, no server, no VPN required.
+No PC, no server, nothing extra to set up.
 
 > Apache-2.0 · Free to use · Commercial use permitted
 
@@ -18,7 +18,7 @@ Paste one command into Termux and it handles the rest. **Pick one based on your 
 curl -fsSL https://gitee.com/luyao23333/silly-tavern-termux/raw/main/install.sh | bash
 ```
 
-**Behind a VPN / overseas**
+**Overseas**
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/luyao20000315-sketch/SillyTavern-Termux/main/install.sh | bash
