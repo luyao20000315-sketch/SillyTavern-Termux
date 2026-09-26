@@ -31,21 +31,26 @@ It will:
 3. Clone the Tavern core, pinned to v1.18.0
 4. Run `npm install`
 5. Write the control panel to `~/st.sh` and add an `st` alias
+6. Enable the auto-panel: from now on, opening Termux pops the panel up by itself
 
-Open a new Termux session and type `st`:
+Open a new Termux session and the panel appears on its own (to opt out: `export ST_NO_PANEL=1`; to summon it manually, type `st`):
 
 ```
-┌────────────────────────────────────────────┐
-│  Tavern Console                       stopped │
+╭────────────────────────────────────────────╮
+│                                            │
+│   Tavern Console                     stopped │
+│                                            │
 ├────────────────────────────────────────────┤
-│  [1] Start      [2] Stop      [3] Restart  │
-│  [4] Status     [5] Logs                   │
+│   [1] Start      [2] Stop      [3] Restart │
+│   [4] Status     [5] Logs                  │
+│                                            │
+│   [6] Update     [7] Tavern Helper         │
+│   [8] Backup     [9] Restore               │
+│                                            │
 ├────────────────────────────────────────────┤
-│  [6] Update     [7] Tavern Helper          │
-│  [8] Backup     [9] Restore                │
-├────────────────────────────────────────────┤
-│  [10] Uninstall [0] Exit                   │
-└────────────────────────────────────────────┘
+│   [10] Uninstall                  [0] Exit │
+╰────────────────────────────────────────────╯
+  open http://127.0.0.1:8000 in your browser
 ```
 
 Then open `http://127.0.0.1:8000` in your phone browser.
@@ -68,8 +73,8 @@ Verify with `pkg --version` in Termux.
 
 | Item | What it does |
 |------|--------------|
-| `[1]` Start | Launches in the background and **only reports success once the port actually answers**. If the process dies mid-startup it dumps the log tail instead of lying to you |
-| `[2]` `[3]` | Stop / restart. Matches only the Tavern's own process — it will not kill other node processes on your phone |
+| `[1]` Start | Launches in the background and **only reports success once the port actually answers**. If the process dies mid-startup it dumps the log tail instead of lying to you. On success it takes a `termux-wake-lock` so the CPU stays awake |
+| `[2]` `[3]` | Stop / restart. Matches only the Tavern's own process — it will not kill other node processes on your phone. Stopping releases the wake lock |
 | `[4]` Status | PID, port probe result, current version, backup count |
 | `[5]` Logs | Last 30 lines. Follow live with `tail -f ~/.st-logs/server.log` |
 | `[6]` Update | Moves to the latest stable release. **China mirrors lag behind** — if it sees a newer release upstream it offers to pull from GitHub instead |
@@ -82,7 +87,7 @@ Verify with `pkg --version` in Termux.
 
 ## Keeping it alive
 
-If Android kills Termux, the Tavern goes down with it. Do all three:
+Menu `[1]` takes a `termux-wake-lock` automatically (you'll see a Termux keep-awake notification) so the CPU won't be frozen while the screen is off; `[2]` releases it. It does **not** prevent Android from killing the background app, so still do all three:
 
 - Run Termux in a floating window / split screen
 - Settings → Battery → Termux → **Unrestricted**
@@ -153,6 +158,9 @@ Note it's `apt`, **not `pkg upgrade`** — `pkg` is a shell wrapper that calls c
 **`st` → command not found**
 The alias lives in `~/.bashrc`, which only gets re-read in a new session. In the current one, use `bash ~/st.sh`.
 
+**Panel doesn't auto-open in a new Termux session**
+The auto-panel is the `ST_PANEL_AUTO` hook in `~/.bashrc`, which a running session won't re-read. If you exported `ST_NO_PANEL=1`, that session won't pop it — `unset ST_NO_PANEL` to bring it back.
+
 **Red error on start**
 The script doesn't fake success. Check menu `[5]`. Usually port 8000 is taken, or dependencies are incomplete (just re-run `install.sh`).
 
@@ -185,4 +193,6 @@ printf '8\n\n4\n\n9\n1\nn\n\n0\n' | bash /tmp/panel.sh   # backup → status →
 
 ## License
 
-Apache License 2.0 — see [LICENSE](LICENSE). Commercial use, modification and redistribution all permitted.
+This project (the deploy script and the panel) is Apache License 2.0 — see [LICENSE](LICENSE). Commercial use, modification and redistribution all permitted.
+
+One thing to be clear about: the script merely installs [SillyTavern](https://github.com/SillyTavern/SillyTavern) onto your phone by pulling it from its official repository. This project **embeds no SillyTavern code, modifies none, and redistributes none** — SillyTavern remains under its own AGPL-3.0 license, owned by its authors. Your use of SillyTavern itself after installing it via this script is governed by AGPL-3.0 and the upstream repository's terms.

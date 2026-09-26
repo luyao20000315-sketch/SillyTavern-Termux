@@ -287,6 +287,11 @@ hold() { printf '\n'; read -r -p "  ── 回车继续 ──" _ || true; }
 # 抹掉当前行（CJK 是双宽字符，光 \r 回不到行首，得配 ESC[K 擦）
 clear_line() { [ -t 1 ] && printf '\r\033[K'; return 0; }
 
+# 锁屏保活：酒馆跑着时压住 CPU 不让 Android 冻结，停了就放开。
+# 都是 Termux 自带命令，非 Termux 环境（比如调试）静默跳过
+grab_wake() { command -v termux-wake-lock >/dev/null 2>&1 && termux-wake-lock; return 0; }
+drop_wake() { command -v termux-wake-unlock >/dev/null 2>&1 && termux-wake-unlock; return 0; }
+
 # 只认酒馆自己的进程：工作目录必须在酒馆目录里 —— 手机上还有别的 node/start.sh，
 # 光看命令名会误伤。启动早期 npm 在跑、node 没起来，所以 bash start.sh 也算活着。
 tavern_pids() {
@@ -357,7 +362,7 @@ start_tavern() {
   for i in $(seq 1 60); do
     code=$(probe)
     if [ -n "$code" ] && [ "$code" != "000" ]; then
-      printf '\n'; good "已启动 → http://127.0.0.1:8000"
+      printf '\n'; grab_wake; good "已启动 → http://127.0.0.1:8000"
       return 0
     fi
     if ! is_up; then
@@ -378,11 +383,12 @@ stop_tavern() {
   kill $pids 2>/dev/null
   local i
   for i in $(seq 1 10); do
-    is_up || { good "已停止"; return 0; }
+    is_up || { good "已停止"; drop_wake; return 0; }
     sleep 1
   done
   kill -9 $pids 2>/dev/null
   note "等了 10 秒还在，直接强杀了"
+  drop_wake
 }
 
 show_status() {
