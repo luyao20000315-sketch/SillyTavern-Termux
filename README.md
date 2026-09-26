@@ -10,11 +10,21 @@
 
 ## 它做什么
 
+Termux 里粘一条命令，剩下的它自己办。**按你的网络选一条**：
+
+**国内网络（推荐，直连 Gitee）**
+
+```bash
+curl -fsSL https://gitee.com/luyao23333/silly-tavern-termux/raw/main/install.sh | bash
 ```
+
+**能翻墙 / 海外**
+
+```bash
 curl -fsSL https://raw.githubusercontent.com/luyao20000315-sketch/SillyTavern-Termux/main/install.sh | bash
 ```
 
-Termux 里粘这一条，剩下的它自己办：
+它会自动：
 
 1. 把 apt 源换成国内镜像（换不动就自动回滚，不会把你的源搞坏）
 2. 装 git / node / curl

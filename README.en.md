@@ -10,17 +10,27 @@ No PC, no server, no VPN required.
 
 ## What it does
 
+Paste one command into Termux and it handles the rest. **Pick one based on your network:**
+
+**Mainland China (recommended — direct from Gitee)**
+
+```bash
+curl -fsSL https://gitee.com/luyao23333/silly-tavern-termux/raw/main/install.sh | bash
 ```
+
+**Behind a VPN / overseas**
+
+```bash
 curl -fsSL https://raw.githubusercontent.com/luyao20000315-sketch/SillyTavern-Termux/main/install.sh | bash
 ```
 
-Paste that into Termux and it handles the rest:
+It will:
 
-1. Points apt at a mainland-China mirror (rolls back automatically if the mirror doesn't answer, so your sources can't end up broken)
-2. Installs git / node / curl
-3. Clones the Tavern core, pinned to v1.18.0
-4. Runs `npm install`
-5. Writes the control panel to `~/st.sh` and adds an `st` alias
+1. Point apt at a mainland-China mirror (rolls back automatically if the mirror doesn't answer, so your sources can't end up broken)
+2. Install git / node / curl
+3. Clone the Tavern core, pinned to v1.18.0
+4. Run `npm install`
+5. Write the control panel to `~/st.sh` and add an `st` alias
 
 Open a new Termux session and type `st`:
 
