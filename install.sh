@@ -117,7 +117,10 @@ ensure_packages() {
   [ ${#missing[@]} -eq 0 ] && { ok "基础依赖齐全"; return 0; }
 
   step "装基础依赖: ${missing[*]}"
-  pkg install -y git nodejs-lts curl nano || die "依赖装不上，检查网络后重试"
+  # 索引过期会让 pkg install 撞 404（真机常见：几个月没 pkg update），先刷一遍
+  step "刷新软件包索引"
+  apt update >/dev/null 2>&1 || warn "索引没刷下来，硬装试试（失败就先手动 apt update）"
+  pkg install -y git nodejs-lts curl nano || die "依赖装不上。先手动 apt update 一次，再重跑本脚本"
   ok "依赖就绪"
 }
 
@@ -139,8 +142,11 @@ clone_with_fallback() {
   local log="$LOG_DIR/clone-$$.log"
 
   if [ -e "$dest" ] && [ ! -d "$dest/.git" ]; then
-    warn "$dest 已存在但不是 git 仓库，清掉重来"
-    rm -rf "$dest"
+    # 不能 rm -rf：用户可能手动装过酒馆、config.yaml 里有 API Key。改名保留
+    local bak
+    bak="$dest.bak.$(date +%Y%m%d-%H%M%S)"
+    warn "$dest 已存在但不是 git 仓库，改名保留为 $bak"
+    mv "$dest" "$bak" || die "备份改名失败，中止安装以免误删数据"
   fi
 
   step "拉取 $label"
@@ -266,9 +272,9 @@ NPM_MIRROR="https://registry.npmmirror.com"
 NPM_UPSTREAM="https://registry.npmjs.org"
 
 if [ -t 1 ]; then
-  C_OK=$'\033[32m'; C_WARN=$'\033[33m'; C_ERR=$'\033[31m'; C_HI=$'\033[36m'; C_OFF=$'\033[0m'
+  C_OK=$'\033[32m'; C_WARN=$'\033[33m'; C_ERR=$'\033[31m'; C_HI=$'\033[36m'; C_BOLD=$'\033[1m'; C_DIM=$'\033[2m'; C_OFF=$'\033[0m'
 else
-  C_OK=''; C_WARN=''; C_ERR=''; C_HI=''; C_OFF=''
+  C_OK=''; C_WARN=''; C_ERR=''; C_HI=''; C_BOLD=''; C_DIM=''; C_OFF=''
 fi
 say()  { printf '%s\n' "$*"; }
 good() { printf '%s  ok%s %s\n' "$C_OK" "$C_OFF" "$*"; }
@@ -281,12 +287,16 @@ hold() { printf '\n'; read -r -p "  ── 回车继续 ──" _ || true; }
 # 抹掉当前行（CJK 是双宽字符，光 \r 回不到行首，得配 ESC[K 擦）
 clear_line() { [ -t 1 ] && printf '\r\033[K'; return 0; }
 
-# 只认酒馆自己的 node 进程。绝不 pkill node —— 手机上还有别的 node 在跑。
+# 只认酒馆自己的进程：工作目录必须在酒馆目录里 —— 手机上还有别的 node/start.sh，
+# 光看命令名会误伤。启动早期 npm 在跑、node 没起来，所以 bash start.sh 也算活着。
 tavern_pids() {
+  local p
   if command -v pgrep >/dev/null 2>&1; then
-    pgrep -f 'node server\.js' 2>/dev/null
+    for p in $(pgrep -f 'node server\.js|bash start\.sh' 2>/dev/null); do
+      [ "$(readlink "/proc/$p/cwd" 2>/dev/null)" = "$TAVERN_DIR" ] && echo "$p"
+    done
   else
-    ps -ef 2>/dev/null | awk '/[n]ode server\.js/ {print $2}'
+    ps -ef 2>/dev/null | awk '/[n]ode server\.js|[b]ash start\.sh/ {print $2}'
   fi
 }
 is_up() { [ -n "$(tavern_pids)" ]; }
@@ -325,18 +335,33 @@ start_tavern() {
 
   mkdir -p "$(dirname "$SRV_LOG")"
   : > "$SRV_LOG"
-  ( cd "$TAVERN_DIR" && nohup bash start.sh >>"$SRV_LOG" 2>&1 </dev/null & )
+  # ST 官方 start.sh 每次启动都先跑一遍 npm install（它自己没有跳过逻辑），
+  # 装完一次后每次都白等几十秒。依赖齐了直接拉 node；node_modules 不在才走 start.sh 兜底。
+  # setsid 脱离会话：node 会重置 SIGHUP 处置，光 nohup 挡不住终端关闭（ssh 调试必踩）
+  (
+    cd "$TAVERN_DIR" || exit 1
+    if [ -d node_modules ]; then
+      run="env NODE_ENV=production node server.js"
+    else
+      run="bash start.sh"
+    fi
+    if command -v setsid >/dev/null 2>&1; then
+      setsid nohup $run >>"$SRV_LOG" 2>&1 </dev/null &
+    else
+      nohup $run >>"$SRV_LOG" 2>&1 </dev/null &
+    fi
+  )
 
-  printf '  等端口起来'
+  printf '  正在启动'
   local i code
   for i in $(seq 1 60); do
     code=$(probe)
     if [ -n "$code" ] && [ "$code" != "000" ]; then
-      printf '\n'; good "起来了 → http://127.0.0.1:8000"
+      printf '\n'; good "已启动 → http://127.0.0.1:8000"
       return 0
     fi
     if ! is_up; then
-      printf '\n'; bad "进程挂了，日志尾巴："
+      printf '\n'; bad "启动失败，日志最后几行："
       tail -n 20 "$SRV_LOG" 2>/dev/null | sed 's/^/      /'
       return 1
     fi
@@ -344,7 +369,7 @@ start_tavern() {
     sleep 1
   done
   printf '\n'
-  note "一分钟还没就绪，可能还在初始化。看日志: tail -f $SRV_LOG"
+  note "一分钟了还没就绪，可能还在初始化。实时日志: tail -f $SRV_LOG"
 }
 
 stop_tavern() {
@@ -357,13 +382,15 @@ stop_tavern() {
     sleep 1
   done
   kill -9 $pids 2>/dev/null
-  note "强杀了"
+  note "等了 10 秒还在，直接强杀了"
 }
 
 show_status() {
   if is_up; then good "运行中  PID $(tavern_pids | tr '\n' ' ')"
   else note "没在运行"; fi
-  say "  端口探测   $(probe)"
+  local code; code=$(probe)
+  if [ "$code" = "000" ]; then code="无响应"; else code="HTTP $code"; fi
+  say "  端口探测   $code"
   say "  安装位置   $TAVERN_DIR"
   [ -d "$TAVERN_DIR/.git" ] && say "  当前版本   $(git -C "$TAVERN_DIR" describe --tags 2>/dev/null || echo '?')"
   say "  数据目录   $TAVERN_DIR/data"
@@ -434,7 +461,7 @@ toggle_extension() {
   printf '  克隆酒馆助手... '
   if git clone --depth 1 https://gitlab.com/novi028/JS-Slash-Runner.git "$dest" >/dev/null 2>&1 \
   || git clone --depth 1 https://github.com/N0VI028/JS-Slash-Runner.git "$dest" >/dev/null 2>&1; then
-    good "装好了"
+    good "装好了，去酒馆「扩展」面板启用"
   else
     bad "没装上"
     return 1
@@ -501,17 +528,21 @@ remove_tavern() {
 draw_menu() {
   local state; is_up && state="${C_OK}运行中${C_OFF}" || state="${C_WARN}已停止${C_OFF}"
   printf '\n'
-  printf '%s┌────────────────────────────────────────────┐%s\n' "$C_HI" "$C_OFF"
-  printf '%s│%s  酒馆控制台                     %s\n' "$C_HI" "$C_OFF" "$state"
-  printf '%s├────────────────────────────────────────────┤%s\n' "$C_HI" "$C_OFF"
-  printf '%s│%s  %s[1]%s 启动        %s[2]%s 停止      %s[3]%s 重启\n' "$C_HI" "$C_OFF" "$C_OK" "$C_OFF" "$C_OK" "$C_OFF" "$C_OK" "$C_OFF"
-  printf '%s│%s  %s[4]%s 状态        %s[5]%s 日志\n' "$C_HI" "$C_OFF" "$C_OK" "$C_OFF" "$C_OK" "$C_OFF"
-  printf '%s├────────────────────────────────────────────┤%s\n' "$C_HI" "$C_OFF"
-  printf '%s│%s  %s[6]%s 更新版本    %s[7]%s 酒馆助手\n' "$C_HI" "$C_OFF" "$C_OK" "$C_OFF" "$C_OK" "$C_OFF"
-  printf '%s│%s  %s[8]%s 备份数据    %s[9]%s 恢复数据\n' "$C_HI" "$C_OFF" "$C_OK" "$C_OFF" "$C_OK" "$C_OFF"
-  printf '%s├────────────────────────────────────────────┤%s\n' "$C_HI" "$C_OFF"
-  printf '%s│%s  %s[10]%s 卸载酒馆   %s[0]%s 退出\n' "$C_HI" "$C_OFF" "$C_ERR" "$C_OFF" "$C_OK" "$C_OFF"
-  printf '%s└────────────────────────────────────────────┘%s\n' "$C_HI" "$C_OFF"
+  printf '%s╭────────────────────────────────────────────╮%s\n' "$C_HI" "$C_OFF"
+  printf '%s│%s                                            %s│%s\n' "$C_HI" "$C_OFF" "$C_HI" "$C_OFF"
+  printf '%s│%s   %s酒馆控制台%s                        %s %s│%s\n' "$C_HI" "$C_OFF" "$C_BOLD" "$C_OFF" "$state" "$C_HI" "$C_OFF"
+  printf '%s│%s                                            %s│%s\n' "$C_HI" "$C_OFF" "$C_HI" "$C_OFF"
+  printf '%s├────────────────────────────────────────────┤%s\n' "$C_DIM" "$C_OFF"
+  printf '%s│%s   %s[1]%s 启动      %s[2]%s 停止      %s[3]%s 重启     %s│%s\n' "$C_HI" "$C_OFF" "$C_HI" "$C_OFF" "$C_HI" "$C_OFF" "$C_HI" "$C_OFF" "$C_HI" "$C_OFF"
+  printf '%s│%s   %s[4]%s 状态      %s[5]%s 日志                   %s│%s\n' "$C_HI" "$C_OFF" "$C_HI" "$C_OFF" "$C_HI" "$C_OFF" "$C_HI" "$C_OFF"
+  printf '%s│%s                                            %s│%s\n' "$C_HI" "$C_OFF" "$C_HI" "$C_OFF"
+  printf '%s│%s   %s[6]%s 更新版本  %s[7]%s 酒馆助手               %s│%s\n' "$C_HI" "$C_OFF" "$C_HI" "$C_OFF" "$C_HI" "$C_OFF" "$C_HI" "$C_OFF"
+  printf '%s│%s   %s[8]%s 备份数据  %s[9]%s 恢复数据               %s│%s\n' "$C_HI" "$C_OFF" "$C_HI" "$C_OFF" "$C_HI" "$C_OFF" "$C_HI" "$C_OFF"
+  printf '%s│%s                                            %s│%s\n' "$C_HI" "$C_OFF" "$C_HI" "$C_OFF"
+  printf '%s├────────────────────────────────────────────┤%s\n' "$C_DIM" "$C_OFF"
+  printf '%s│%s   %s[10]%s 卸载酒馆                   %s[0]%s 退出 %s│%s\n' "$C_HI" "$C_OFF" "$C_ERR" "$C_OFF" "$C_OK" "$C_OFF" "$C_HI" "$C_OFF"
+  printf '%s╰────────────────────────────────────────────╯%s\n' "$C_HI" "$C_OFF"
+  printf '%s  浏览器打开 http://127.0.0.1:8000%s\n' "$C_DIM" "$C_OFF"
 }
 
 main_loop() {
@@ -558,9 +589,28 @@ ST_PANEL_EOF
       printf '\n# SillyTavern 管理面板（由 install.sh 写入）\n'
       printf "alias st='bash \$HOME/st.sh'\n"
     } >> "$rc"
-    ok "已写入别名 st → 重开 Termux 生效"
+    ok "已写入别名 st"
   else
     ok "别名 st 已存在"
+  fi
+
+  # 打开 Termux 自动弹面板：小白不用记命令，见到菜单按数字就行。
+  # 护栏：非交互 shell（ssh 远程命令、scp）不弹；没有 tty 不弹；ST_PANEL_DONE
+  # 在弹之前就 export —— Termux 的 /etc/profile 和 ~/.profile 会把 .bashrc 读两遍，
+  # 登录 shell 里再开 bash 也继承它，保证一场只弹一次。
+  if ! grep -qF "ST_PANEL_AUTO" "$rc" 2>/dev/null; then
+    {
+      printf '\n# ST_PANEL_AUTO · 打开 Termux 自动弹面板（由 install.sh 写入；不想自动弹: export ST_NO_PANEL=1）\n'
+      printf 'case $- in *i*) if [ -f "$HOME/st.sh" ] && [ -t 0 ] && [ -z "$ST_NO_PANEL" ] && [ -z "$ST_PANEL_DONE" ]; then export ST_PANEL_DONE=1; bash "$HOME/st.sh"; fi ;; esac\n'
+    } >> "$rc"
+    ok "已开启自动面板 → 重开 Termux 直接见菜单"
+  fi
+
+  # Termux 的 bash 若以登录 shell 启动只认 .profile（默认不存在），补一条转发，
+  # 保证 App 内和 ssh 两条路都能读到 .bashrc 里的钩子
+  local pf="$HOME/.profile"
+  if [ ! -f "$pf" ] || ! grep -q "\.bashrc" "$pf" 2>/dev/null; then
+    printf '\n[ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"\n' >> "$pf"
   fi
 }
 
@@ -594,7 +644,7 @@ main() {
   rule
   printf '  %s装好了%s\n' "$C_OK" "$C_OFF"
   rule
-  printf '  管理面板   st       %s(当前窗口: bash ~/st.sh)%s\n' "$C_DIM" "$C_OFF"
+  printf '  管理面板   重开 Termux 自动弹出   %s(手动: st)%s\n' "$C_DIM" "$C_OFF"
   printf '  浏览器     http://127.0.0.1:8000\n'
   printf '  数据在     %s/data\n' "$TAVERN_DIR"
   printf '\n'
@@ -604,7 +654,7 @@ main() {
   if [ -t 0 ]; then
     bash "$PANEL_PATH"
   else
-    printf '  重开 Termux，输入 st 进面板\n'
+    printf '  重开 Termux 就会自动弹出面板\n'
   fi
 }
 
