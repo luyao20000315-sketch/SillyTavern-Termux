@@ -1,0 +1,6 @@
+# 手机端要的是 LF。Windows 上 core.autocrlf=true 会把工作区换成 CRLF，
+# 那样 shebang 和 heredoc 在 Termux 上会直接崩（bad interpreter / 命令带 \r）。
+* text=auto eol=lf
+*.sh text eol=lf
+*.js text eol=lf
+*.md text eol=lf
